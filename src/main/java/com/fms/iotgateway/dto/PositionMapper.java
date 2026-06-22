@@ -11,16 +11,17 @@ public final class PositionMapper {
 
     public static PositionResponse toResponse(Position position) {
         return new PositionResponse(
-            position.id().toString(),
+            position.uuid().toString(),
             position.deviceId(),
-            position.serverTime().toString(),
-            position.deviceTime() != null ? position.deviceTime().toString() : null,
+            position.fixTime(),
+            position.receivedAt(),
             position.latitude(),
             position.longitude(),
             position.altitude(),
-            position.speed(),
-            position.course(),
-            position.accuracy()
+            position.speed() != null ? position.speed().doubleValue() : null,
+            position.course() != null ? position.course().doubleValue() : null,
+            position.accuracy(),
+            position.batteryLevel()
         );
     }
 }

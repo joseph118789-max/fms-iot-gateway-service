@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,29 +35,34 @@ public class PositionService {
     /**
      * Process an incoming position from Traccar webhook.
      * Converts Traccar DTO to domain object and persists.
+     *
+     * <p>D.18.w Option B: duplicate (deviceId, fixTime) is silently ignored
+     * via ON CONFLICT DO NOTHING in the INSERT statement.
+     * Traccar retries are idempotent at the app layer.
      */
     @Transactional
     public Position processPosition(TraccarWebhookRequest request) {
         log.debug("Processing position for device {}: lat={}, lon={}, speed={}",
             request.deviceId(), request.latitude(), request.longitude(), request.speed());
 
-        Position position = new Position(
+        Position position = Position.fromTraccar(
             UUID.randomUUID(),
             request.deviceId(),
-            millisToInstant(request.serverTimeMs()),
-            millisToInstant(request.deviceTimeMs()),
-            millisToInstant(request.processedTimeMs()),
+            request.deviceTimeMs(),
+            request.serverTimeMs(),
+            request.processedTimeMs(),
             request.latitude(),
             request.longitude(),
             request.altitude(),
             request.speed(),
             request.course(),
             request.accuracy(),
-            Instant.now()
+            null // rawPayload — could serialize full request if needed
         );
 
         positionRepository.save(position);
-        log.info("Saved position {} for device {}", position.id(), position.deviceId());
+        log.info("Saved position for device {} at fixTime={}",
+            position.deviceId(), position.fixTime());
         return position;
     }
 
@@ -74,7 +81,9 @@ public class PositionService {
     @Transactional(readOnly = true)
     public Page<Position> getPositions(Instant from, Instant to, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return positionRepository.findByServerTimeBetween(from, to, pageable);
+        OffsetDateTime fromDt = OffsetDateTime.ofInstant(from, ZoneOffset.UTC);
+        OffsetDateTime toDt = OffsetDateTime.ofInstant(to, ZoneOffset.UTC);
+        return positionRepository.findByReceivedAtBetween(fromDt, toDt, pageable);
     }
 
     /**
@@ -83,9 +92,5 @@ public class PositionService {
     @Transactional(readOnly = true)
     public Optional<Position> getLatestPosition(Long deviceId) {
         return positionRepository.findLatestByDeviceId(deviceId);
-    }
-
-    private Instant millisToInstant(Long millis) {
-        return millis != null ? Instant.ofEpochMilli(millis) : Instant.now();
     }
 }
