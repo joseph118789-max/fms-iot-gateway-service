@@ -5,9 +5,8 @@
 
     Schema: telemetry (jdbc:postgresql://.../ubiqtrac?currentSchema=telemetry)
 
-    Tables to include (placeholder — verify against actual telemetry schema):
-      - tc_position: Traccar position records
-      - tc_device: Traccar device registry
+    Tables to include (verified against actual telemetry schema):
+      - position: Traccar position records (1 row in telemetry schema)
 
     Three things that MUST be explicit:
       1. <inputSchema> — always telemetry (not ubiqtrac)
