@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
  *
  * Phase 2b conventions: env-driven secrets, no hardcoded fallbacks.
  * EnvVarValidator pattern mirrors phase2a conventions.
+ *
+ * Set skip.env.validation=true to disable (e.g., for unit tests).
  */
 @Component
 public class EnvVarValidator {
@@ -24,6 +26,11 @@ public class EnvVarValidator {
 
     @PostConstruct
     public void validate() {
+        if (Boolean.parseBoolean(env.getProperty("skip.env.validation", "false"))) {
+            log.info("EnvVarValidator skipped (skip.env.validation=true)");
+            return;
+        }
+
         log.info("Validating required environment variables...");
 
         // DB credentials — required in all environments
