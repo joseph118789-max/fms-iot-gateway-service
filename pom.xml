@@ -29,6 +29,7 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jooq.version>3.19.15</jooq.version>
+        <jooq.skip>true</jooq.skip>
     </properties>
 
     <dependencies>
@@ -103,6 +104,7 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
+                            <skip>${jooq.skip}</skip>
                             <configurationFile>src/main/resources/jooq-codegen.xml</configurationFile>
                         </configuration>
                     </execution>
