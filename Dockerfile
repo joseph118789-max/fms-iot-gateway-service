@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for iot-gateway-service.
-# Stage 1: build with Maven + JDK 21
+# Stage 1: maven image with JDK 21 (pre-downloads deps, faster rebuilds)
 # Stage 2: minimal JRE 21 runtime, non-root user, healthcheck
 #
 # Build:
@@ -17,11 +17,14 @@
 #     192.168.1.239:5000/iot-gateway-service:0.1.0-SNAPSHOT
 
 # --- Build stage ---
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
 
-# Copy source and build
+# Download deps once (layer cached unless pom.xml changes)
 COPY pom.xml ./
+RUN mvn -B -ntp dependency:go-offline
+
+# Copy source and build
 COPY src ./src
 RUN mvn -B -ntp -DskipTests package
 
