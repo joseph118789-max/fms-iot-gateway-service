@@ -59,6 +59,14 @@
             <artifactId>spring-boot-starter-jooq</artifactId>
         </dependency>
 
+        <!-- Spring Data Commons (Pageable/PageRequest) without JPA — needed for pagination
+             in PositionService/PositionRepository. Standalone module, no Hibernate.
+             D.18.g dependency shape: only what we use, nothing extra. -->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-commons</artifactId>
+        </dependency>
+
         <!-- jOOQ -->
         <dependency>
             <groupId>org.jooq</groupId>
@@ -99,9 +107,17 @@
                         <goals>
                             <goal>generate</goal>
                         </goals>
+                        <!-- JDBC values supplied via Maven properties (Case A pattern from device-service).
+                             CLI: -Dcodegen.jdbc.url=... -Dcodegen.jdbc.username=... -Dcodegen.jdbc.password=...
+                             Merged into jooq-codegen.xml via property substitution. -->
                         <configuration>
                             <skip>${jooq.skip}</skip>
                             <configurationFile>src/main/resources/jooq-codegen.xml</configurationFile>
+                            <jdbc>
+                                <url>${codegen.jdbc.url}</url>
+                                <user>${codegen.jdbc.username}</user>
+                                <password>${codegen.jdbc.password}</password>
+                            </jdbc>
                         </configuration>
                     </execution>
                 </executions>

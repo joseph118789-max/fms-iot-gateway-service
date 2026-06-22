@@ -13,16 +13,12 @@
       2. <includes> — table filter
       3. <forcedTypes> — JSONB, UUID, INET mappings
 
-    db.password is set by exec-maven-plugin in the codegen profile (Case A).
-    Never read from .env, settings.xml, or a file on disk.
+    JDBC block is supplied by pom.xml plugin config (Case A pattern from device-service).
+    Values: ${codegen.jdbc.url}, ${codegen.jdbc.username}, ${codegen.jdbc.password}
+    Passed via CLI: -Dcodegen.jdbc.url=... -Dcodegen.jdbc.username=... -Dcodegen.jdbc.password=...
+    Never hardcoded here. Never read from .env, settings.xml, or a file on disk.
 -->
 <configuration xmlns="http://www.jooq.org/xsd/jooq-codegen-3.19.0.xsd">
-    <jdbc>
-        <url>${db.url}</url>
-        <user>${db.user}</user>
-        <password>${db.password}</password>
-    </jdbc>
-
     <generator>
         <database>
             <name>org.jooq.meta.postgres.PostgresDatabase</name>

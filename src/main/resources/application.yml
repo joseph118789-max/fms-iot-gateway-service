@@ -8,6 +8,16 @@ spring:
     driver-class-name: org.postgresql.Driver
   jooq:
     sql-dialect: postgres
+  # OAuth2 Resource Server — JWT validation against Keycloak.
+  # D.18.k rule: BOTH issuer-uri AND jwk-set-uri are required. issuer-uri does NOT
+  # auto-derive jwk-set-uri. Both are sourced from K8s Secret iot-gateway-creds
+  # via deployment envFrom/valueFrom: secretKeyRef (D.18.bb compliant).
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
 
 server:
   port: 8080
