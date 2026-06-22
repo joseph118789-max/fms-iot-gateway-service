@@ -28,7 +28,7 @@
         <database>
             <name>org.jooq.meta.postgres.PostgresDatabase</name>
             <inputSchema>telemetry</inputSchema>
-            <includes>tc_position|tc_device</includes>
+            <includes>position</includes>
             <excludes></excludes>
             <forcedTypes>
                 <forcedType>
@@ -48,7 +48,7 @@
 
         <target>
             <packageName>com.fms.iotgateway.jooq</packageName>
-            <directory>src/generated/java</directory>
+            <directory>target/generated-sources/jooq</directory>
         </target>
 
         <strategy>
