@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    jOOQ codegen local example — DO NOT COMMIT ACTUAL CREDENTIALS.
+    Copy to jooq-codegen.local.xml and fill in your local dev values.
+
+    For CI/CD: use -Pcodegen profile with K8s Secret retrieval (Case A).
+    For local dev without codegen: just use `mvn clean package` (skip is on by default).
+-->
+<configuration xmlns="http://www.jooq.org/xsd/jooq-codegen-3.19.0.xsd">
+    <jdbc>
+        <url>jdbc:postgresql://localhost:5432/ubiqtrac?currentSchema=telemetry</url>
+        <user>telemetry_writer</user>
+        <password>YOUR_PASSWORD_HERE</password>
+    </jdbc>
+    <generator>
+        <database>
+            <inputSchema>telemetry</inputSchema>
+            <includes>tc_position|tc_device</includes>
+        </database>
+    </generator>
+</configuration>

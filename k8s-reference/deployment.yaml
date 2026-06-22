@@ -1,0 +1,121 @@
+# Reference K8s manifests for iot-gateway-service.
+# Engineering-side reference for:
+#   - env var contract (DB_URL, DB_USER, DB_PASSWORD from Secret)
+#   - probe paths (/actuator/health/liveness, /actuator/health/readiness)
+#   - resource requests/limits
+#   - anti-affinity / spread
+#
+# DevOps's actual manifests are the source of truth.
+# Image tag: build with `docker build -t 192.168.1.239:5000/iot-gateway-service:0.1.0-SNAPSHOT .`
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-gateway-service
+  namespace: fms-iot-gateway
+  labels:
+    app: iot-gateway-service
+    version: 0.1.0-SNAPSHOT
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: iot-gateway-service
+  template:
+    metadata:
+      labels:
+        app: iot-gateway-service
+        version: 0.1.0-SNAPSHOT
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: iot-gateway-service
+          image: 192.168.1.239:5000/iot-gateway-service:0.1.0-SNAPSHOT
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          # Env contract: DB password from K8s Secret iot-gateway-creds
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://172.22.0.8:5432/ubiqtrac?currentSchema=telemetry
+            - name: DB_USER
+              value: telemetry_writer
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: iot-gateway-creds
+                  key: DB_PASSWORD
+            - name: TRACCAR_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: traccar-config
+                  key: TRACCAR_BASE_URL
+            - name: TRACCAR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: traccar-credentials
+                  key: TRACCAR_API_KEY
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: iot-gateway-service
+                topologyKey: kubernetes.io/hostname

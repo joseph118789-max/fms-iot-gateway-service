@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: iot-gateway-service
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jooq:
+    sql-dialect: postgres
+
+server:
+  port: 8080
+
+# Traccar polling config (env-driven, no defaults)
+traccar:
+  base-url: ${TRACCAR_BASE_URL:http://localhost:8082}
+  api-key: ${TRACCAR_API_KEY:}
+  poll-interval-ms: ${TRACCAR_POLL_INTERVAL_MS:60000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.fms.iotgateway: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

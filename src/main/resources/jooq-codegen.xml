@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    jOOQ codegen configuration — Phase 2b IoT Gateway.
+    Mirrors phase2a conventions.
+
+    Schema: telemetry (jdbc:postgresql://.../ubiqtrac?currentSchema=telemetry)
+
+    Tables to include (placeholder — verify against actual telemetry schema):
+      - tc_position: Traccar position records
+      - tc_device: Traccar device registry
+
+    Three things that MUST be explicit:
+      1. <inputSchema> — always telemetry (not ubiqtrac)
+      2. <includes> — table filter
+      3. <forcedTypes> — JSONB, UUID, INET mappings
+
+    db.password is set by exec-maven-plugin in the codegen profile (Case A).
+    Never read from .env, settings.xml, or a file on disk.
+-->
+<configuration xmlns="http://www.jooq.org/xsd/jooq-codegen-3.19.0.xsd">
+    <jdbc>
+        <url>${db.url}</url>
+        <user>${db.user}</user>
+        <password>${db.password}</password>
+    </jdbc>
+
+    <generator>
+        <database>
+            <name>org.jooq.meta.postgres.PostgresDatabase</name>
+            <inputSchema>telemetry</inputSchema>
+            <includes>tc_position|tc_device</includes>
+            <excludes></excludes>
+            <forcedTypes>
+                <forcedType>
+                    <name>JSONB</name>
+                    <types>jsonb</types>
+                </forcedType>
+                <forcedType>
+                    <name>UUID</name>
+                    <types>uuid</types>
+                </forcedType>
+                <forcedType>
+                    <name>INET</name>
+                    <types>inet</types>
+                </forcedType>
+            </forcedTypes>
+        </database>
+
+        <target>
+            <packageName>com.fms.iotgateway.jooq</packageName>
+            <directory>src/generated/java</directory>
+        </target>
+
+        <strategy>
+            <name>org.jooq.codegen.DefaultGeneratorStrategy</name>
+        </strategy>
+    </generator>
+</configuration>
