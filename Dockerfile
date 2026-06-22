@@ -20,13 +20,17 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
 
-# Download deps once (layer cached unless pom.xml changes)
+# Cache deps (layer cached unless pom.xml changes)
 COPY pom.xml ./
 RUN mvn -B -ntp dependency:go-offline
 
-# Copy source and build
+# Copy pre-generated jOOQ sources (built host-side where K8s Secret creds are available)
+# Codegen NEVER runs in Docker — no credentials in image
 COPY src ./src
-RUN mvn -B -ntp -DskipTests package
+COPY target/generated-sources ./target/generated-sources
+
+# Build with codegen disabled (already done host-side via Case A kubectl secret retrieval)
+RUN mvn -B -ntp -DskipTests -Djooq.skip=true package
 
 # --- Runtime stage ---
 FROM eclipse-temurin:21-jre-jammy
