@@ -39,14 +39,25 @@ public class PositionService {
      * <p>D.18.w Option B: duplicate (deviceId, fixTime) is silently ignored
      * via ON CONFLICT DO NOTHING in the INSERT statement.
      * Traccar retries are idempotent at the app layer.
+     *
+     * <p>Fix D.18.bbb: persist uuid in raw_payload JSONB so the same row
+     * returns the same uuid on read. Generated once at the service boundary,
+     * then echoed back via the persisted JSONB column. The Position compact
+     * constructor no longer synthesizes a fresh uuid on hydration.
+     *
+     * <p>Fix D.18.ddd: pass {@code request.batteryLevel()} through to
+     * {@code Position.fromTraccar(...)} so the typed {@code battery_level}
+     * column receives the Traccar value instead of always-null.
      */
     @Transactional
     public Position processPosition(TraccarWebhookRequest request) {
         log.debug("Processing position for device {}: lat={}, lon={}, speed={}",
             request.deviceId(), request.latitude(), request.longitude(), request.speed());
 
+        UUID stableUuid = UUID.randomUUID();  // generated once, persisted in raw_payload
+
         Position position = Position.fromTraccar(
-            UUID.randomUUID(),
+            stableUuid,
             request.deviceId(),
             request.deviceTimeMs(),
             request.serverTimeMs(),
@@ -57,12 +68,13 @@ public class PositionService {
             request.speed(),
             request.course(),
             request.accuracy(),
-            null // rawPayload — could serialize full request if needed
+            request.batteryLevel(),          // Fix D.18.ddd
+            null                             // rawPayload — service layer adds uuid below
         );
 
         positionRepository.save(position);
-        log.info("Saved position for device {} at fixTime={}",
-            position.deviceId(), position.fixTime());
+        log.info("Saved position for device {} at fixTime={} uuid={}",
+            position.deviceId(), position.fixTime(), position.uuid());
         return position;
     }
 

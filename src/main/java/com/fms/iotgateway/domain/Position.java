@@ -1,6 +1,8 @@
 package com.fms.iotgateway.domain;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 /**
@@ -28,15 +30,29 @@ public record Position(
     OffsetDateTime receivedAt,    // server-side receipt time (NOT NULL, default now())
     String rawPayload             // JSONB, nullable
 ) {
+    /**
+     * Fix D.18.bbb: do NOT generate uuid here. Compact constructor side-effects
+     * that assign default values produce fresh UUIDs on every read of the same
+     * record (because jOOQ hydrates from DB by calling the canonical
+     * constructor). Pass uuid explicitly via fromTraccar(...) or a service-layer
+     * helper. This preserves the API contract (every Position has a uuid)
+     * while making the value stable across reads of the same persisted row.
+     */
     public Position {
         if (receivedAt == null) receivedAt = OffsetDateTime.now();
-        if (uuid == null) uuid = UUID.randomUUID();
     }
 
     /**
      * Factory for Traccar webhook — maps Traccar fields to domain.
      * Traccar sends serverTimeMs (server) and deviceTimeMs (device).
      * We treat deviceTimeMs as fixTime, serverTimeMs as receivedAt.
+     *
+     * <p>Fix D.18.ccc: deviceTimeMs / serverTimeMs / processedTimeMs are
+     * epoch-millisecond values from Traccar. They MUST be parsed via
+     * Instant.ofEpochMilli(...).atOffset(ZoneOffset.UTC) — NOT replaced with
+     * OffsetDateTime.now(). Replacing with now() collapses the unique key
+     * (device_id, fix_time) into (device_id, NOW) and ON CONFLICT DO NOTHING
+     * silently never fires.
      */
     public static Position fromTraccar(
             UUID uuid,
@@ -50,28 +66,29 @@ public record Position(
             Double speed,
             Double course,
             Double accuracy,
+            Float batteryLevel,
             String rawPayload) {
 
         OffsetDateTime fixTime = deviceTimeMs != null
-            ? OffsetDateTime.now().withNano(0) // TODO: parse actual offset from Traccar payload
+            ? Instant.ofEpochMilli(deviceTimeMs).atOffset(ZoneOffset.UTC)
             : OffsetDateTime.now();
 
         OffsetDateTime receivedAt = serverTimeMs != null
-            ? OffsetDateTime.now().withNano(0) // TODO: parse actual offset from Traccar payload
+            ? Instant.ofEpochMilli(serverTimeMs).atOffset(ZoneOffset.UTC)
             : OffsetDateTime.now();
 
         return new Position(
-            uuid != null ? uuid : UUID.randomUUID(),
+            uuid,                       // Fix D.18.bbb: pass through, never synthesize
             deviceId,
-            fixTime,
+            fixTime,                    // Fix D.18.ccc: real deviceTime, not now()
             latitude,
             longitude,
             altitude,
             speed != null ? speed.floatValue() : null,
             course != null ? course.floatValue() : null,
             accuracy,
-            null, // batteryLevel not in Traccar webhook payload
-            receivedAt,
+            batteryLevel,               // Fix D.18.ddd: threaded from DTO
+            receivedAt,                 // Fix D.18.ccc: real serverTime, not now()
             rawPayload
         );
     }

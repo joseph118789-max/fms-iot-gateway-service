@@ -2,6 +2,7 @@ package com.fms.iotgateway.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * DTO for Traccar position webhook (POST /api/v1/traccar/position).
@@ -9,6 +10,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * <p>Traccar uses both "latitude"/"longitude" and "lat"/"lon" field names
  * depending on version/config. Both are accepted via @JsonAlias.
+ *
+ * <p>Fix D.18.ddd: Traccar sends "batteryLevel" in its position payload.
+ * The previous version of this DTO omitted the field entirely, so the
+ * typed {@code battery_level} column always received {@code null} while
+ * the JSONB path captured the raw value. Both routes are now consistent.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record TraccarWebhookRequest(
@@ -29,7 +35,8 @@ public record TraccarWebhookRequest(
     String protocol,
     Long serverTimeMs,
     Long deviceTimeMs,
-    Long processedTimeMs
+    Long processedTimeMs,
+    @JsonProperty("batteryLevel") Float batteryLevel
 ) {
     public TraccarWebhookRequest {
         // Normalize null speed to 0.0
@@ -49,13 +56,15 @@ public record TraccarWebhookRequest(
             Double altitude, Double speed, Double course, Double accuracy,
             Double altitudeZh, Double distance, Double totalDistance,
             Boolean motion, String address, String protocol,
-            Long serverTimeMs, Long deviceTimeMs, Long processedTimeMs) {
+            Long serverTimeMs, Long deviceTimeMs, Long processedTimeMs,
+            Float batteryLevel) {
         return new TraccarWebhookRequest(
             latitude, longitude,
             id, deviceId, type,
             altitude, speed, course, accuracy,
             altitudeZh, distance, totalDistance,
             motion, address, protocol,
-            serverTimeMs, deviceTimeMs, processedTimeMs);
+            serverTimeMs, deviceTimeMs, processedTimeMs,
+            batteryLevel);
     }
 }

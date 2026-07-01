@@ -83,6 +83,12 @@ public class PositionRepositoryImpl implements PositionRepository {
 
     @Override
     public void save(Position position) {
+        // Fix D.18.bbb: persist uuid into raw_payload JSONB so reads return
+        // the same uuid value that was written. Without this, every read of
+        // the same row would synthesize a fresh UUID (D.18.bbb defect).
+        String rawPayloadWithUuid = injectUuidIntoRawPayload(
+            position.rawPayload(), position.uuid());
+
         dsl.insertInto(Tables.POSITION)
             .set(Tables.POSITION.DEVICE_ID, position.deviceId())
             .set(Tables.POSITION.FIX_TIME, position.fixTime())
@@ -97,14 +103,47 @@ public class PositionRepositoryImpl implements PositionRepository {
             .set(Tables.POSITION.BATTERY_LEVEL, position.batteryLevel())
             .set(Tables.POSITION.RECEIVED_AT, position.receivedAt())
             .set(Tables.POSITION.RAW_PAYLOAD,
-                position.rawPayload() != null
-                    ? JSONB.jsonb(position.rawPayload())
+                rawPayloadWithUuid != null
+                    ? JSONB.jsonb(rawPayloadWithUuid)
                     : null)
             .onConflictDoNothing()  // D.18.w Option B: silent duplicate ignore
             .execute();
 
-        log.debug("Inserted position for deviceId={}, fixTime={}",
-            position.deviceId(), position.fixTime());
+        log.debug("Inserted position for deviceId={}, fixTime={}, uuid={}",
+            position.deviceId(), position.fixTime(), position.uuid());
+    }
+
+    /**
+     * Inject the uuid into raw_payload JSONB so the same uuid is returned on
+     * subsequent reads. If rawPayload is null, synthesize a minimal
+     * {@code {"uuid":"..."}} wrapper. If rawPayload already has a uuid key,
+     * leave it untouched (preserve the original uuid across re-saves).
+     */
+    private static String injectUuidIntoRawPayload(String rawPayload, UUID uuid) {
+        if (uuid == null) return rawPayload;
+        if (rawPayload == null || rawPayload.isBlank()) {
+            return "{\"uuid\":\"" + uuid + "\"}";
+        }
+        if (rawPayload.contains("\"uuid\"")) {
+            return rawPayload;  // already has uuid, preserve
+        }
+        // Splice the uuid key in right after the opening brace
+        int braceIdx = rawPayload.indexOf('{');
+        if (braceIdx < 0) {
+            return "{\"uuid\":\"" + uuid + "\"," + rawPayload;
+        }
+        int insertAt = braceIdx + 1;
+        // Skip whitespace
+        while (insertAt < rawPayload.length() && Character.isWhitespace(rawPayload.charAt(insertAt))) {
+            insertAt++;
+        }
+        // Check if there's content after the brace
+        boolean hasContent = insertAt < rawPayload.length() && rawPayload.charAt(insertAt) != '}';
+        String injection = "\"uuid\":\"" + uuid + "\"";
+        if (hasContent) {
+            injection = injection + ",";
+        }
+        return rawPayload.substring(0, insertAt) + injection + rawPayload.substring(insertAt);
     }
 
     @Override
@@ -114,14 +153,32 @@ public class PositionRepositoryImpl implements PositionRepository {
 
     /**
      * Map a jOOQ position record to domain Position.
-     * Schema has no uuid column — generate one for domain compatibility.
+     * Schema has no uuid column — recover from rawPayload JSONB if present,
+     * else fall back to a deterministic derivation from deviceId + fixTime.
      * Schema uses Float for altitude/speed/course/batteryLevel, domain uses Double/Float.
+     *
+     * <p>Fix D.18.bbb: do NOT synthesize a fresh UUID on every read.
+     * The uuid is generated once at the service layer and persisted inside
+     * the raw_payload JSONB column (under key "uuid"). Reading the same row
+     * twice MUST return the same uuid. If raw_payload lacks the uuid key
+     * (rows written before D.18.bbb was fixed), derive a deterministic uuid
+     * from (deviceId, fixTime) so reads remain stable.
      */
     private Position mapToPosition(Record record) {
         JSONB rawPayloadJsonb = record.get(Tables.POSITION.RAW_PAYLOAD);
         String rawPayload = rawPayloadJsonb != null ? rawPayloadJsonb.data() : null;
+
+        UUID stableUuid = extractUuidFromRawPayload(rawPayload);
+        if (stableUuid == null) {
+            // Legacy rows: derive deterministically from (deviceId, fixTime)
+            Long deviceId = record.get(Tables.POSITION.DEVICE_ID);
+            OffsetDateTime fixTime = record.get(Tables.POSITION.FIX_TIME);
+            String seed = deviceId + "|" + (fixTime != null ? fixTime.toString() : "null");
+            stableUuid = UUID.nameUUIDFromBytes(seed.getBytes());
+        }
+
         return new Position(
-            UUID.randomUUID(),  // schema has no uuid — generate for domain use
+            stableUuid,
             record.get(Tables.POSITION.DEVICE_ID),
             record.get(Tables.POSITION.FIX_TIME),
             record.get(Tables.POSITION.LATITUDE),
@@ -134,6 +191,28 @@ public class PositionRepositoryImpl implements PositionRepository {
             record.get(Tables.POSITION.RECEIVED_AT),
             rawPayload
         );
+    }
+
+    /**
+     * Extract the persisted uuid from raw_payload JSONB if present.
+     * Returns null if rawPayload is null, malformed, or lacks the uuid key.
+     * Cheap string scan — avoids pulling in a JSON parser dependency.
+     */
+    private static UUID extractUuidFromRawPayload(String rawPayload) {
+        if (rawPayload == null) return null;
+        int idx = rawPayload.indexOf("\"uuid\"");
+        if (idx < 0) return null;
+        int colon = rawPayload.indexOf(':', idx);
+        if (colon < 0) return null;
+        int q1 = rawPayload.indexOf('"', colon);
+        if (q1 < 0) return null;
+        int q2 = rawPayload.indexOf('"', q1 + 1);
+        if (q2 < 0) return null;
+        try {
+            return UUID.fromString(rawPayload.substring(q1 + 1, q2));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static Double doubleValue(Double v) { return v; }
