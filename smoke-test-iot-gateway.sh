@@ -51,10 +51,10 @@ pwget() {
     local path="$2"
     if [ -n "$headers" ]; then
         ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 user@192.168.1.150 \
-            "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl exec -n $NS $POD -c iot-gateway-service -- wget -qO- $headers $path" 2>/dev/null
+            "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl exec -n $NS $POD -c iot-gateway-service -- wget -qO- \"$headers\" \"$path\"" 2>/dev/null
     else
         ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 user@192.168.1.150 \
-            "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl exec -n $NS $POD -c iot-gateway-service -- wget -qO- $path" 2>/dev/null
+            "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl exec -n $NS $POD -c iot-gateway-service -- wget -qO- \"$path\"" 2>/dev/null
     fi
 }
 
@@ -62,7 +62,7 @@ pwget_verbose() {
     local headers="$1"
     local path="$2"
     ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 user@192.168.1.150 \
-        "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl exec -n $NS $POD -c iot-gateway-service -- wget $headers -S -O /dev/null $path 2>&1 | grep -E 'HTTP/|HTTP ' | head -2" 2>/dev/null
+        "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl exec -n $NS $POD -c iot-gateway-service -- wget \"$headers\" -S -O /dev/null \"$path\" 2>&1 | grep -E 'HTTP/|HTTP ' | head -2" 2>/dev/null
 }
 
 PASS=0
