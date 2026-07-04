@@ -28,17 +28,17 @@ if [ -z "$POD" ]; then
 fi
 echo "Target pod: $POD"
 
-# Load test user creds
-source /opt/phase1-rotation/keycloak-test-user.env
-KC_TEST_USER_PASSWORD="$KC_TEST_USER_PASSWORD"
+# Load ubiqtrac-v4 client credentials (production client, surgical fix #3 binds realm roles)
+source /opt/phase1-rotation/keycloak.env
+UBIQTRAC_CLIENT_SECRET="$UBIQTRAC_CLIENT_SECRET"
 
-# Get JWT from Keycloak
+# Get JWT from Keycloak via client_credentials (Option B — CTO call 2026-07-04 00:46 UTC)
+# ubiqtrac-v4 service account has realm roles: default-roles-fms, fms-admin, fms-operator, fms-viewer
 JWT=$(curl -s -X POST "http://192.168.1.239:8180/auth/realms/fms/protocol/openid-connect/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "grant_type=password" \
+    -d "grant_type=client_credentials" \
     -d "client_id=ubiqtrac-v4" \
-    -d "username=$KC_TEST_USER" \
-    -d "password=$KC_TEST_USER_PASSWORD" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token", ""))')
+    -d "client_secret=$UBIQTRAC_CLIENT_SECRET" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token", ""))')
 if [ -z "$JWT" ]; then
     echo "FAIL: could not get JWT from Keycloak"
     exit 1
